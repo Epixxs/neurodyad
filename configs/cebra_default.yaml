@@ -1,0 +1,33 @@
+model:
+  model_architecture: "offset10-model"
+  time_offsets: 10
+  output_dimension: 3
+  distance: "cosine"
+  conditional: "time_delta"
+  temperature_mode: "auto"
+  temperature: 1.0
+  min_temperature: 0.1
+  batch_size: 512
+  learning_rate: 0.0003
+  max_iterations: 5000
+  device: "cuda:0"
+  verbose: true
+
+preprocessing:
+  raw_sampling_rate: 1000
+  target_sampling_rate: 250
+  bandpass_low: 0.1
+  bandpass_high: 45.0
+  channels_per_participant: 64
+  ica_method: "infomax"
+  ica_components: 15
+  ica_extended: true
+
+labels:
+  version: "v3"
+  aq_shift_offset: 10
+
+evaluation:
+  knn_neighbors: 5
+  knn_metric: "cosine"
+  num_seeds: 5
