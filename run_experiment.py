@@ -1,4 +1,4 @@
-﻿import argparse
+import argparse
 from pathlib import Path
 import yaml
 import numpy as np
@@ -39,6 +39,9 @@ def parse_args():
     parser.add_argument("--run_controls", action="store_true")
     parser.add_argument("--run_lodo", action="store_true")
     parser.add_argument("--train", action="store_true")
+    parser.add_argument("--synthetic", action="store_true", help="Force using synthetic mock dataset (8 dyads) for testing/dry-runs")
+    parser.add_argument("--num_seeds", type=int, default=None, help="Number of seeds for LODO evaluation (overrides config)")
+    parser.add_argument("--max_iterations", type=int, default=None, help="Max iterations for CEBRA training (overrides config)")
     return parser.parse_args()
 
 def main():
@@ -46,18 +49,25 @@ def main():
     with open(args.config, "r") as f:
         config = yaml.safe_load(f) or {}
 
+    model_config = config.get("model", {})
+    if args.max_iterations is not None:
+        model_config["max_iterations"] = args.max_iterations
+
     print(f"Loaded config: {args.config}")
     print(f"Label scheme: {args.label_version}")
 
     data_dir = Path(args.data_dir)
     metadata_csv = Path(args.metadata_csv)
     dataset = DyadDataset()
-    if data_dir.exists() and metadata_csv.exists():
+    if not args.synthetic and data_dir.exists() and metadata_csv.exists():
         print(f"Scanning for real recordings in {data_dir} using {metadata_csv}...")
         dataset = load_dataset_from_directory(data_dir, metadata_csv, preprocess=True)
 
     if len(dataset.dyads) == 0:
-        print("[Notice] Real files not detected in data/raw. Using synthetic mock dataset for testing.")
+        if args.synthetic:
+            print("[Notice] Using synthetic mock dataset (8 dyads) as requested by --synthetic.")
+        else:
+            print("[Notice] Real files not detected in data/raw. Using synthetic mock dataset for testing.")
         dataset = build_synthetic_dyad_dataset()
 
     X, y = dataset.get_neural_and_labels(label_version=args.label_version)
@@ -65,13 +75,24 @@ def main():
 
     if args.run_lodo:
         print("\n--- Running Leave-One-Dyad-Out (N+1) Generalization Analysis ---")
+        if len(dataset.dyads) < 2:
+            print(f"[Notice] Leave-One-Dyad-Out (LODO) cross-validation requires at least 2 dyads (N >= 2) to train on N-1 dyads and test on the held-out dyad.")
+            print(f"Currently, only {len(dataset.dyads)} dyad ({list(dataset.dyads.keys())}) is registered in '{metadata_csv}'.")
+            print("\nOptions:")
+            print("  1. To test the LODO pipeline with synthetic multi-dyad data:")
+            print("     python run_experiment.py --run_lodo --synthetic")
+            print("  2. To run with real recordings, register additional dyads in:")
+            print(f"     {metadata_csv}")
+            return
+        num_seeds = args.num_seeds if args.num_seeds is not None else config.get("evaluation", {}).get("num_seeds", 5)
         lodo = LeaveOneDyadOutEvaluator(
             dataset=dataset,
-            cebra_config=config.get("model", {}),
+            cebra_config=model_config,
             label_version=args.label_version,
-            num_seeds=config.get("evaluation", {}).get("num_seeds", 5),
+            num_seeds=num_seeds,
         )
         results = lodo.run()
+        print("\n--- LODO Generalization Summary ---")
         for r in results:
             print(f"Dyad {r['dyad_name']} ({r['gender_group']}): GOF={r['gof_mean']:.4f}+/-{r['gof_std']:.4f}, KNN={r['knn_mean']:.4f}+/-{r['knn_std']:.4f}")
         return
@@ -86,7 +107,7 @@ def main():
 
     if args.train:
         print("\n--- Training CEBRA Model ---")
-        cebra_model = DyadicCEBRAModel(config.get("model", {}))
+        cebra_model = DyadicCEBRAModel(model_config)
         embeddings = cebra_model.fit_transform(X, y)
         print(f"Learned 3D embeddings shape: {embeddings.shape}")
         out_dir = Path("outputs")

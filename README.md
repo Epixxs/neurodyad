@@ -4,7 +4,7 @@ Reproduction of **"Dyadic Neural Dynamics: Extending Representation Learning to 
 
 ## Status
 
-**Pipeline Implemented & Data Ingestion Verified.**
+**Pipeline Implemented, Model Trained & LODO Validation Verified.**
 
 - **Environment & Hardware**: Configured and verified with Python 3.11, PyTorch (CUDA-enabled with NVIDIA GeForce RTX 3050 Laptop GPU), CEBRA 0.6.0, MNE 1.11.0, and scikit-learn.
 - **Core Pipeline Implementation**:
@@ -18,6 +18,10 @@ Reproduction of **"Dyadic Neural Dynamics: Extending Representation Learning to 
   - Continuous dyadic EEG recordings (`Speaker.edf` and `Listener.edf`) placed in `data/raw/` and configured in `data/metadata/dyads_metadata.csv`.
   - Signal integrity verified: 65 channels per participant, 250.0 Hz sampling rate, 75,750 aligned samples (~5.05 minutes).
   - Joint dyadic feature matrix verified and loaded: $X \in \mathbb{R}^{75750 \times 130}$ with matching label vectors.
+- **Current Progress & Executed Experiments**:
+  - **Model Training**: Successfully trained CEBRA model on the paired dyadic EEG dataset using the V3 label scheme (Speaker vs. Listener). Output embeddings, labels, and 3D latent space visualization (`outputs/latent_space_v3.png`) generated.
+  - **LODO (N+1) Cross-Validation**: Successfully executed Leave-One-Dyad-Out cross-validation using the synthetic multi-dyad benchmark (8 mock dyads) across 5 random seeds, verifying the train/test split, 5-NN decoding accuracy, and Ridge regression Goodness-of-Fit ($R^2$) scoring pipeline.
+  - **Comprehensive Documentation**: Detailed design decisions and trade-offs documented in [`decision.md`](decision.md); execution flow and lifecycle tracing documented in [`flow.md`](flow.md).
 
 ## Project Structure
 
@@ -32,6 +36,10 @@ neurodyad/
 │   └── raw/
 │       ├── Speaker.edf             # Participant 1 recording (65 ch, 250 Hz)
 │       └── Listener.edf            # Participant 2 recording (65 ch, 250 Hz)
+├── outputs/
+│   ├── embeddings.npy              # Learned 3D CEBRA latent embeddings
+│   ├── labels.npy                  # Aligned behavioral labels
+│   └── latent_space_v3.png         # 3D spherical latent space visualization
 ├── scripts/
 │   └── inspect_edf.py              # Header & signal inspection utility
 ├── src/
@@ -52,10 +60,17 @@ neurodyad/
 │   └── evaluation/
 │       ├── metrics.py              # 5-NN accuracy, Goodness-of-Fit (R^2), consistency score
 │       └── visualizer.py           # 3D latent scatter, consistency heatmaps, loss curves
+├── decision.md                     # Architectural decisions, rationale & trade-offs
+├── flow.md                         # Code execution flow & lifecycle documentation
 ├── run_experiment.py               # CLI experiment runner
 ├── requirements.txt                # Python dependencies
 └── README.md
 ```
+
+## Documentation
+
+- **[`decision.md`](decision.md)**: Detailed breakdown of architectural and neuroscience decisions (channel concatenation, 2-stage normalization, CEBRA hyperparameter choices, V1–V6 label formulations, and control strategies) along with trade-offs.
+- **[`flow.md`](flow.md)**: Comprehensive trace of how execution moves through the codebase, from entry points to preprocessing, pairing, model modes, LODO loops, and tensor shape transformations.
 
 ## Available Commands
 
@@ -74,13 +89,18 @@ python run_experiment.py --config configs/cebra_default.yaml --label_version v3
 python run_experiment.py --run_controls
 ```
 
-### Train CEBRA Model (Upcoming Step)
+### Train CEBRA Model
 ```bash
 python run_experiment.py --train
 ```
+*Fits the CEBRA model on the paired dyadic EEG dataset and exports embeddings and 3D latent scatter plot to `outputs/`.*
 
 ### Run Leave-One-Dyad-Out (N+1) Generalization
 ```bash
+# Run with synthetic multi-dyad test data (8 mock dyads, evaluated across random seeds)
+python run_experiment.py --run_lodo --synthetic
+
+# With real multi-dyad recordings (requires >= 2 dyads in data/metadata/dyads_metadata.csv)
 python run_experiment.py --run_lodo
 ```
 

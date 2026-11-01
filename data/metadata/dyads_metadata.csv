@@ -1,0 +1,2 @@
+dyad_id,dyad_name,filename_p1,filename_p2,gender_p1,gender_p2,aq_p1,aq_p2,role_swap_sample_idx
+1,dyad_01,Speaker.edf,Listener.edf,F,M,18,24,37875

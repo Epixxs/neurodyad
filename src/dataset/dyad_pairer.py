@@ -1,4 +1,4 @@
-﻿from typing import Tuple, List, Dict, Any, Optional
+from typing import Tuple, List, Dict, Any, Optional
 from dataclasses import dataclass
 import numpy as np
 
@@ -39,12 +39,18 @@ class DyadDataset:
     def get_neural_and_labels(self, label_version: str, dyad_ids: Optional[List[int]] = None, aq_shift_offset: int = 10) -> Tuple[np.ndarray, np.ndarray]:
         from .label_generators import get_labels_for_dyad
         target_ids = dyad_ids if dyad_ids is not None else list(self.dyads.keys())
+        if not target_ids:
+            raise ValueError("No dyad IDs provided or available in dataset to extract neural data and labels.")
         all_x, all_y = [], []
         for did in target_ids:
+            if did not in self.dyads:
+                raise KeyError(f"Dyad ID {did} not found in dataset. Available IDs: {list(self.dyads.keys())}")
             item = self.dyads[did]
             neural = item["neural"]
             meta: DyadMetadata = item["metadata"]
             labels = get_labels_for_dyad(meta, len(neural), label_version, aq_shift_offset)
             all_x.append(neural)
             all_y.append(labels)
+        if not all_x:
+            raise ValueError("No dyad neural data available to concatenate.")
         return np.concatenate(all_x, axis=0), np.concatenate(all_y, axis=0)

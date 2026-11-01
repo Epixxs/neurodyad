@@ -1,4 +1,4 @@
-﻿from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional
 import numpy as np
 
 class DyadicCEBRAModel:
@@ -20,10 +20,20 @@ class DyadicCEBRAModel:
         }
         if config:
             self.config.update(config)
+        self.seed = self.config.pop("seed", None)
         self.model = None
 
     def fit(self, X: np.ndarray, y: Optional[np.ndarray] = None) -> "DyadicCEBRAModel":
         import cebra
+        if self.seed is not None:
+            import random
+            import torch
+            random.seed(self.seed)
+            np.random.seed(self.seed)
+            torch.manual_seed(self.seed)
+            if torch.cuda.is_available():
+                torch.cuda.manual_seed_all(self.seed)
+
         self.model = cebra.CEBRA(**self.config)
         if y is not None and self.config.get("conditional") != "time_delta":
             self.model.fit(X, y)
